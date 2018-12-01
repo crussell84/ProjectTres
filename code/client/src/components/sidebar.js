@@ -2,6 +2,7 @@ import React from "react";
 import usericon from "../default_pic.svg";
 import downArrow from "../arrow_down.svg";
 import {NavLink} from 'react-router-dom';
+import logo from "../../src/ent3rprise.svg"
 
 class Sidebar extends React.Component {
   constructor(props) {
@@ -13,7 +14,7 @@ class Sidebar extends React.Component {
     <div>
       <div className="sidebar">
         <div>
-          <p id="companylogo">Ent3rprise</p>
+          <p id="companylogo">Demo Company</p>
         </div>
         <div id="account">
           <div id="userinfo">
@@ -26,12 +27,13 @@ class Sidebar extends React.Component {
         </div>
         <div className={"useroptions " + (this.props.displayOptions ? "active-comp" : "inactive-comp")}>
           <NavLink to="/profile" activeClassName="activeLink">My Profile</NavLink>
-          <a href="/market/orders">Logout</a>
+          <NavLink to="/logout" onClick={this.props.signOut}>Logout</NavLink>
           
         </div>
         <div className="links">
         {this.props.children}
         </div>
+        <div className="sidebarLogoContainer"><img className="logo" src={logo} /><div className="logoTextContainer"><p className="logoText">ENT3RPRISE</p><p className="logoSlogan">procure different</p></div></div>
       </div>
     </div>
   );

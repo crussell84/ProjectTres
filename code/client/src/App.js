@@ -2,7 +2,6 @@ import React from "react";
 import "./App.css";
 import axios from "axios";
 import AuthRoutes from "./routes/AuthRoutes";
-import { Link, Redirect } from "react-router-dom";
 
 class App extends React.Component {
   constructor() {
@@ -25,6 +24,10 @@ class App extends React.Component {
       usersData: [],
       ordersData: [],
       orderHistory: [],
+      returnToMarket: false,
+      filtered: [],
+      shipping: 0,
+      shoppingRedirect: false,
       orderTotal: 0,
       orderCompleted: false
     };
@@ -37,6 +40,15 @@ class App extends React.Component {
     this.getAllUsers();
     this.getAllOrders();
     this.checkforAuth();
+  }
+
+  componentWillMount(){
+    this.getData();
+    const products = this.state.productsData;
+
+    this.setState({
+      productData: products
+    })
   }
 
   userHasAuthenticated = authenticated => {
@@ -60,18 +72,49 @@ class App extends React.Component {
   addToCart = event => {
     const productID = event.target.dataset.id;
     let productBeingAdded = this.state.productsData[productID];
-    productBeingAdded.qty = 1;
-    productBeingAdded.subtotal = productBeingAdded.price;
-    let total = (
-      Number(this.state.orderTotal) + Number(productBeingAdded.price)
-    ).toFixed(2);
-    const productData = this.state.cart.concat(productBeingAdded);
-    window.Materialize.toast("Added to cart!", 1500);
-    this.setState({
-      cart: productData,
-      orderTotal: total,
-      inCart: this.state.inCart + 1
-    });
+    const product = event.target.dataset.product
+    let productInCart = false;
+    
+    for (let i = 0; i < this.state.cart.length; i++){
+      if (this.state.cart[i].id.includes(product)){
+        productInCart = true;
+        window.Materialize.toast("Quanity Updated", 1500);
+      }
+    }
+
+    if (productInCart) {
+      let cartArr = this.state.cart;
+      let modifiedProduct = cartArr[productID];
+      modifiedProduct.subtotal = Number(modifiedProduct.subtotal).toFixed(2)
+      modifiedProduct.qty += 1
+      modifiedProduct.subtotal = (Number(modifiedProduct.subtotal) + Number(modifiedProduct.price)).toFixed(2)
+
+      let total = (Number(this.state.orderTotal) + Number(modifiedProduct.price)).toFixed(2);
+        cartArr.splice(productID, 1, modifiedProduct);
+
+      this.setState({
+        cart: cartArr,
+        orderTotal: total
+      });
+      
+    }
+
+    if (!productInCart){
+      productBeingAdded.qty = 1;
+      productBeingAdded.subtotal = productBeingAdded.price;
+  
+      let total = (Number(this.state.orderTotal) + Number(productBeingAdded.price)).toFixed(2);
+      const productData = this.state.cart.concat(productBeingAdded);
+      window.Materialize.toast("Added to cart!", 1500);
+  
+      console.log(productBeingAdded.subtotal)
+      this.setState({
+        cart: productData,
+        orderTotal: total,
+        inCart: this.state.inCart + 1
+      });
+    }
+    
   };
 
   removeFromCart = event => {
@@ -80,7 +123,7 @@ class App extends React.Component {
       Number(this.state.orderTotal) - Number(event.target.dataset.subtotal)
     ).toFixed(2);
     let cartItem = this.state.cart;
-    const removeItem = cartItem.splice(productID, 1);
+    let removeItem = cartItem.splice(productID, 1);
 
     this.setState({
       cart: cartItem,
@@ -89,25 +132,14 @@ class App extends React.Component {
     });
   };
 
-  resetOrder = () => {
-    this.setState({
-      orderCompleted: false
-    })
-  }
-
   changeQty = event => {
     let cartArr = this.state.cart;
     const productId = event.target.dataset.id;
     let modifiedProduct = cartArr[productId];
+    let currentSubtotal = modifiedProduct.subtotal
     modifiedProduct.qty = event.target.value;
-    modifiedProduct.subtotal = (
-      modifiedProduct.qty * modifiedProduct.price
-    ).toFixed(2);
-    let total = (
-      Number(this.state.orderTotal) -
-      Number(modifiedProduct.price) +
-      Number(modifiedProduct.subtotal)
-    ).toFixed(2);
+    modifiedProduct.subtotal = (modifiedProduct.qty * modifiedProduct.price).toFixed(2);
+    let total = (Number(this.state.orderTotal) - Number(currentSubtotal) + Number(modifiedProduct.subtotal)).toFixed(2);
     cartArr.splice(productId, 1, modifiedProduct);
 
     this.setState({
@@ -118,16 +150,72 @@ class App extends React.Component {
 
   checkOut = () => {
     const cartItems = this.state.cart;
-    cartItems.date = new Date();
-    //setup for orderhistory and date of order
+    
     this.setState({
       orderHistory: cartItems,
       cart: [],
+      shipping: 25.00,
       inCart: 0,
-      orderTotal: 0,
       orderCompleted: true
     });
   };
+
+  continueShopping = () => {
+    this.setState({
+      shipping: 0,
+      orderTotal: 0,
+      orderHistory: [],
+      shoppingRedirect: true
+    });
+  };
+
+  resetOrder = () => {
+    this.setState({
+      orderCompleted: false
+    })
+  };
+
+  continue = () => {
+    this.setState({
+      shoppingRedirect: false
+    });
+  };
+
+  toMarket = () => {
+    let location = window.location.pathname
+    if (location !== "/market") {
+      this.setState({
+        returnToMarket: true
+      });
+    };
+  };
+
+  stopRedirect = () => {
+    this.setState({
+      returnToMarket: false
+    });
+  }
+
+
+  handleSearch = event => {
+    let products = this.state.productsData;
+    let filterProducts = this.state.filtered;
+    
+    if (event.target.value !== "") {
+       filterProducts = filterProducts.filter((item) => {
+        return item.name.toLowerCase().search(
+          event.target.value.toLowerCase()) !== -1;
+      });
+      this.setState({ filtered: filterProducts });
+    }
+    else {
+      filterProducts = products;
+    }
+    
+    this.setState({
+      filtered: filterProducts
+    });
+  }
 
   getData = () => {
     axios({
@@ -135,7 +223,8 @@ class App extends React.Component {
       url: "/api/products"
     }).then(data => {
       this.setState({
-        productsData: data.data
+        productsData: data.data,
+        filtered: data.data
       });
     });
   };
@@ -195,18 +284,13 @@ class App extends React.Component {
   };
 
   signOut = () => {
-    console.log("testing logout");
-    axios.get("api/logout").then(response => {
+     axios.get("api/logout").then(response => {
       this.userHasAuthenticated(false);
       this.setState({
         isAuthenticated: false
       });
       localStorage.removeItem("user");
     });
-  };
-
-  grabUsers = () => {
-    console.log("test");
   };
 
   userOptions = () => {
@@ -233,7 +317,6 @@ class App extends React.Component {
         password: this.state.password
       }
     }).then(data => {
-      console.log(data);
       this.setState({
         isAuthenticated: true,
         uid: data.data.data.id,
@@ -243,18 +326,26 @@ class App extends React.Component {
         admin: data.data.data.admin
       });
       localStorage.setItem("user", JSON.stringify(data));
-      <Link to="/market" />;
     });
   };
 
   render() {
     const childProps = {
       isAuthenticated: this.state.isAuthenticated,
+      shoppingRedirect: this.state.shoppingRedirect,
+      continue: this.continue,
+      shipping: this.state.shipping,
       userHasAuthenticated: this.userHasAuthenticated,
       productsData: this.state.productsData,
+      filtered: this.state.filtered,
+      returnToMarket: this.state.returnToMarket,
+      stopRedirect: this.stopRedirect,
+      toMarket: this.toMarket,
+      handleSearch: this.handleSearch,
       addToCart: this.addToCart,
       removeFromCart: this.removeFromCart,
       changeQty: this.changeQty,
+      continueShopping: this.continueShopping,
       inCart: this.state.inCart,
       handleChange: this.handleChange,
       userOptions: this.userOptions,
